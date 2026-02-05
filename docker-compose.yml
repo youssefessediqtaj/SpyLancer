@@ -1,0 +1,155 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    depends_on:
+      - gateway
+    networks:
+      - spylancer-network
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - auth-service
+      - ads-collector
+      - ads-parser
+      - store-detector
+      - product-extractor
+      - tracking-engine
+      - analytics-engine
+      - redis
+    networks:
+      - spylancer-network
+
+  auth-service:
+    build: ./auth-service
+    expose:
+      - "3007"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/spylancer
+      - JWT_SECRET=spylancer_secret_key_123
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+    depends_on:
+      - mongodb
+    networks:
+      - spylancer-network
+
+  ads-collector:
+    build: ./ads-collector
+    container_name: ads-collector
+    expose:
+      - "3001"
+    environment:
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+    networks:
+      - spylancer-network
+
+  ads-parser:
+    build: ./ads-parser
+    expose:
+      - "3002"
+    environment:
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+    networks:
+      - spylancer-network
+
+  store-detector:
+    build: ./store-detector
+    expose:
+      - "3003"
+    environment:
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+    networks:
+      - spylancer-network
+
+  product-extractor:
+    build: ./product-extractor
+    expose:
+      - "3004"
+    environment:
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+      - MONGO_URL=mongodb://mongodb:27017/spylancer
+    depends_on:
+      - mongodb
+    networks:
+      - spylancer-network
+
+  tracking-engine:
+    build: ./tracking-engine
+    container_name: tracking-engine
+    expose:
+      - "3005"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/spylancer
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+    depends_on:
+      - mongodb
+    networks:
+      - spylancer-network
+
+  analytics-engine:
+    build: ./analytics-engine
+    expose:
+      - "3006"
+    environment:
+      - INTERNAL_KEY=spylancer_prod_secret_2025
+    networks:
+      - spylancer-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: spylancer-ollama
+    expose:
+      - "11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - spylancer-network
+
+  mongodb:
+    image: mongo:4.4
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./mongo-init/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - spylancer-network
+
+  redis:
+    image: redis:alpine
+    expose:
+      - "6379"
+    networks:
+      - spylancer-network
+
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    ports:
+      - "7700:7700"
+    environment:
+      - MEILI_MASTER_KEY=spylancer_meili_master_key_2025
+      - MEILI_ENV=development
+    volumes:
+      - meili-data:/meili_data
+    networks:
+      - spylancer-network
+
+networks:
+  spylancer-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
+  ollama-data:
+  meili-data:
